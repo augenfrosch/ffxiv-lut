@@ -1,0 +1,96 @@
+name: Update TW Lookup Tables
+on:
+  schedule:
+    - cron: '0 */2 * * *' # Every 2 hours
+  workflow_dispatch:
+
+jobs:
+  download:
+    name: Download LUTs (${{matrix.name}})
+    runs-on: ubuntu-latest
+
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - slug: 0b90d03e
+          name: taiwan/ffxiv
+        - slug: be3c0f25
+          name: taiwan/ex1
+        - slug: 27355e9f
+          name: taiwan/ex2
+        - slug: "50326e09"
+          name: taiwan/ex3
+        - slug: ce56fbaa
+          name: taiwan/ex4
+        - slug: b951cb3c
+          name: taiwan/ex5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            .github/
+            luts/${{matrix.slug}}
+            cluts/${{matrix.slug}}
+          sparse-checkout-cone-mode: false
+
+      - name: Download Downloader
+        uses: robinraju/release-downloader@v1
+        with:
+          repository: WorkingRobot/ffxiv-downloader
+          fileName: 'xiv-dl-linux-x64'
+          latest: true
+
+      - name: Setup Executable
+        run: |
+          mv xiv-dl-linux-x64 xiv-dl
+          chmod +x xiv-dl
+
+      - name: Retrieve LUTs
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 15
+          max_attempts: 3
+          command: |
+            ./.github/generate-tw-cluts.py lut -s "${{matrix.slug}}"
+
+      - name: Calculate CLUTs
+        run: |
+          ./.github/generate-tw-cluts.py clut -s "${{matrix.slug}}"
+
+      - name: Extract branch name
+        id: extract_branch
+        shell: bash
+        run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
+
+      - name: Commit Changes
+        id: commit
+        continue-on-error: true
+        env:
+          ACTOR: ${{github.actor}}
+          NAME: ${{matrix.name}}
+        run: |
+          rm xiv-dl
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add --all
+          git commit -m "Update Lookups for $NAME" --author="$ACTOR <$ACTOR@users.noreply.github.com>"
+
+      - name: Fetch, Rebase, and Push
+        uses: nick-fields/retry@v4
+        if: ${{steps.commit.conclusion == 'success'}}
+        with:
+          timeout_minutes: 2
+          max_attempts: 20
+          command: |
+            git push origin ${{steps.extract_branch.outputs.branch}}
+          new_command_on_retry: |
+            git stash
+            git fetch origin
+            git rebase -X theirs origin/${{steps.extract_branch.outputs.branch}}
+            git push origin ${{steps.extract_branch.outputs.branch}}
