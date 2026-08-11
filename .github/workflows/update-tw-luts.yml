@@ -40,11 +40,17 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Download Downloader
-        uses: robinraju/release-downloader@v1
-        with:
-          repository: WorkingRobot/ffxiv-downloader
-          fileName: 'xiv-dl-linux-x64'
-          latest: true
+        run: |
+          wget --verbose --https-only https://github.com/WorkingRobot/ffxiv-downloader/releases/latest/download/xiv-dl-linux-x64
+          curl --verbose https://api.github.com/repos/WorkingRobot/ffxiv-downloader/releases/latest |
+          jq --raw-output '
+            .assets[] |
+            select(.name == "xiv-dl-linux-x64") |
+            { hash: .digest | capture("sha256:(?<hash>[0-9a-f]+)").hash, name: .name } |
+            "\(.hash)  \(.name)"
+          ' |
+          tee /dev/tty |
+          sha256sum --check --strict --warn
 
       - name: Setup Executable
         run: |
