@@ -70,17 +70,16 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Download Downloader
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          wget --verbose --https-only https://github.com/WorkingRobot/ffxiv-downloader/releases/latest/download/xiv-dl-linux-x64
-          curl --verbose https://api.github.com/repos/WorkingRobot/ffxiv-downloader/releases/latest |
-          jq --raw-output '
+          readarray -t LATEST_RELEASE < <(gh api /repos/WorkingRobot/ffxiv-downloader/releases/latest --jq '
             .assets[] |
             select(.name == "xiv-dl-linux-x64") |
-            { hash: .digest | capture("sha256:(?<hash>[0-9a-f]+)").hash, name: .name } |
-            "\(.hash)  \(.name)"
-          ' |
-          tee /dev/tty |
-          sha256sum --check --strict --warn
+            { url: .browser_download_url, name: .name, hash: .digest | capture("sha256:(?<hash>[0-9a-f]+)").hash } |
+            "\(.url)\n\(.name)\n\(.hash)"')
+          curl --verbose --no-progress-meter --location --max-redirs 1 ${LATEST_RELEASE[0]} --output ${LATEST_RELEASE[1]}
+          echo -n "${LATEST_RELEASE[2]}  ${LATEST_RELEASE[1]}" | sha256sum --check --strict --warn
 
       - name: Setup Executable
         run: |
