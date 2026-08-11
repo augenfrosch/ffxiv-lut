@@ -104,22 +104,28 @@ jobs:
         shell: bash
         run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
 
+      - name: Check for diff
+        id: check_for_diff
+        run: |
+          set +x
+          git diff --exit-code; echo "diff=$?" >> $GITHUB_OUTPUT
+
       - name: Commit Changes
-        id: commit
-        continue-on-error: true
+        if: steps.check_for_diff.outputs.diff == '1'
         env:
           ACTOR: ${{github.actor}}
+          ACTOR_ID: ${{github.actor_id}}
           NAME: ${{matrix.name}}
         run: |
           rm xiv-dl
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add --all
-          git commit -m "Update Lookups for $NAME" --author="$ACTOR <$ACTOR@users.noreply.github.com>"
+          git commit -m "Update Lookups for $NAME" --author="$ACTOR <$ACTOR_ID+$ACTOR@users.noreply.github.com>"
 
       - name: Fetch, Rebase, and Push
         uses: nick-fields/retry@v4
-        if: ${{steps.commit.conclusion == 'success'}}
+        if: steps.check_for_diff.outputs.diff == '1'
         with:
           timeout_minutes: 2
           max_attempts: 20
