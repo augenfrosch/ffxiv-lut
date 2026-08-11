@@ -73,11 +73,12 @@ jobs:
         shell: bash
         run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
 
-      - name: Check for diff
+      - name: Stage and check for diff
         id: check_for_diff
         run: |
+          git add luts cluts
           set +x
-          git diff --exit-code; echo "diff=$?" >> $GITHUB_OUTPUT
+          git diff --staged --exit-code; echo "diff=$?" >> $GITHUB_OUTPUT
 
       - name: Commit Changes
         if: steps.check_for_diff.outputs.diff == '1'
@@ -86,10 +87,8 @@ jobs:
           ACTOR_ID: ${{github.actor_id}}
           NAME: ${{matrix.name}}
         run: |
-          rm xiv-dl
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add --all
           git commit -m "Update Lookups for $NAME" --author="$ACTOR <$ACTOR_ID+$ACTOR@users.noreply.github.com>"
 
       - name: Fetch, Rebase, and Push
