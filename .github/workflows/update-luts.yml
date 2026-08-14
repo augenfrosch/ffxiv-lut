@@ -107,7 +107,7 @@ jobs:
         id: check_for_diff
         run: |
           git add luts cluts
-          set +x
+          set +e
           git diff --staged --exit-code; echo "diff=$?" >> $GITHUB_OUTPUT
 
       - name: Commit Changes
@@ -117,6 +117,7 @@ jobs:
           ACTOR_ID: ${{github.actor_id}}
           NAME: ${{matrix.name}}
         run: |
+          rm xiv-dl
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git commit -m "Update Lookups for $NAME" --author="$ACTOR <$ACTOR_ID+$ACTOR@users.noreply.github.com>"
